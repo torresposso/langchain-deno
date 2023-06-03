@@ -1,5 +1,5 @@
 import { Head } from "$fresh/runtime.ts";
-import Counter from "../islands/Counter.tsx";
+import Chat from "../islands/Chat.tsx";
 
 export default function Home() {
   return (
@@ -7,10 +7,8 @@ export default function Home() {
       <Head>
         <title>langChain Test App</title>
       </Head>
-      <div class="p-4 mx-auto max-w-screen-md">
-        <div>
-          <h1>hello World</h1>
-        </div>
+      <div class="p-4 mx-auto max-w-screen-md bg-gray-900">
+        <Chat />
       </div>
     </>
   );

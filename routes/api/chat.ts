@@ -7,61 +7,56 @@ import {
 import { ChatOpenAI } from "langchain/chat_models/openai";
 import { ConversationChain } from "langchain/chains";
 import { BufferMemory } from "langchain/memory";
-import { ensureGetEnv } from "./env.ts";
+import { ensureGetEnv } from "@/utils/env.ts";
+import { readableStreamFromReader } from "$std/streams/mod.ts";
+import { writeAll } from "https://deno.land/std@0.177.0/streams/write_all.ts";
+import { chain, stream } from "@/utils/chat.ts";
 
-import { CallbackManager } from "langchain/callbacks";
-import { writeAll } from "$std/streams/write_all.ts";
+export async function handler(req: Request) {
+  const corsHeaders = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type",
+  };
 
-const encoder = new TextEncoder();
-const stream = new TransformStream();
-const writer = stream.writable.getWriter();
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
 
-const llm = new ChatOpenAI({
-  openAIApiKey: ensureGetEnv("OPENAI_API_KEY"),
-  cache: true,
-  temperature: 0,
-  streaming: true,
-  callbacks: [
-    {
-      handleLLMNewToken: async (token) => {
-        await writer.ready;
-        await writer.write(encoder.encode(token));
-      },
-      handleLLMEnd: async () => {
-        await writer.ready;
-        await writer.close();
-      },
-      handleLLMError: async (e) => {
-        await writer.ready;
-        await writer.abort(e);
-      },
-    },
-  ],
-});
+  const userInput = new URL(req.url).searchParams.get("userInput");
 
-const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-  SystemMessagePromptTemplate.fromTemplate(
-    "The following is a friendly chat between a human an IA. The IA is talkative and provides specific details from its context. If the AI does not know the answer to a question it truthfully says it does not know.",
-  ),
-  new MessagesPlaceholder("history"),
-  HumanMessagePromptTemplate.fromTemplate("{input}"),
-]);
+  console.log("user", userInput);
 
-const chain = new ConversationChain({
-  llm,
-  prompt: chatPrompt,
-  memory: new BufferMemory({
-    returnMessages: true,
-    memoryKey: "history",
-  }),
-});
+  if (!userInput) {
+    throw new Error("Missing query in request data");
+  }
+  console.log("messages", chain.memory);
 
-try {
-  await chain.call({
-    input: "Write me a song about sparkling water.",
+  const response = await chain.call({
+    input: userInput,
   });
-} catch (error) {
-  console.log(error);
-} finally {
-  Deno.exit();
+
+  const stream = new TransformStream();
+  const writer = stream.writable.getWriter();
+
+  chain.callbacks = [{
+    handleLLMNewToken: (token) => {
+      const msg = new TextEncoder().encode(`data: ${token}`);
+      const body = new ReadableStream({
+        start(controller) {
+          controller.enqueue(msg);
+        },
+      });
+      console.log("D", token);
+    },
+  }];
+
+  console.log(body, stream.readable);
+  return new Response(body, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+    },
+  });
 }
