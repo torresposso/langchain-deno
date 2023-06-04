@@ -8,10 +8,6 @@ import { ChatOpenAI } from "langchain/chat_models/openai";
 import { ConversationChain } from "langchain/chains";
 import { BufferMemory } from "langchain/memory";
 import { ensureGetEnv } from "@/utils/env.ts";
-import {
-  readableStreamFromReader,
-  writableStreamFromWriter,
-} from "$std/streams/mod.ts";
 
 const llm = new ChatOpenAI({
   openAIApiKey: ensureGetEnv("OPENAI_API_KEY"),

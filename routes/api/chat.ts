@@ -1,16 +1,9 @@
+import { chain } from "@/utils/chat.ts";
 import {
-  ChatPromptTemplate,
-  HumanMessagePromptTemplate,
-  MessagesPlaceholder,
-  SystemMessagePromptTemplate,
-} from "langchain/prompts";
-import { ChatOpenAI } from "langchain/chat_models/openai";
-import { ConversationChain } from "langchain/chains";
-import { BufferMemory } from "langchain/memory";
-import { ensureGetEnv } from "@/utils/env.ts";
-import { readableStreamFromReader } from "$std/streams/mod.ts";
-import { writeAll } from "https://deno.land/std@0.177.0/streams/write_all.ts";
-import { chain, stream } from "@/utils/chat.ts";
+  writeAll,
+  writeAllSync,
+  writerFromStreamWriter,
+} from "$std/streams/mod.ts";
 
 export async function handler(req: Request) {
   const corsHeaders = {
@@ -23,40 +16,37 @@ export async function handler(req: Request) {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const userInput = new URL(req.url).searchParams.get("userInput");
+  // const userInput = new URL(req.url).searchParams.get("userInput");
+
+  const { userInput } = await req.json();
+
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const reader = readable.getReader();
+  const writerX = writerFromStreamWriter(writer);
 
   console.log("user", userInput);
-
-  if (!userInput) {
-    throw new Error("Missing query in request data");
-  }
-  console.log("messages", chain.memory);
-
-  const response = await chain.call({
-    input: userInput,
-  });
-
-  const stream = new TransformStream();
-  const writer = stream.writable.getWriter();
-
-  chain.callbacks = [{
-    handleLLMNewToken: (token) => {
-      const msg = new TextEncoder().encode(`data: ${token}`);
-      const body = new ReadableStream({
-        start(controller) {
-          controller.enqueue(msg);
+  const response = await chain.call(
+    { input: userInput },
+    [
+      {
+        handleLLMNewToken: async (token) => {
+          const text = new TextEncoder().encode(`data: ${token}`);
+          const xr = await writeAll(writerX, text);
+          console.log("called", xr);
         },
-      });
-      console.log("D", token);
-    },
-  }];
+      },
+    ],
+  );
 
-  console.log(body, stream.readable);
-  return new Response(body, {
+  console.log("res", response);
+
+  const streamedToken = await reader.read();
+
+  return new Response(streamedToken?.value, {
     headers: {
       ...corsHeaders,
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
     },
   });
 }

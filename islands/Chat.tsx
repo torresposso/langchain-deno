@@ -10,21 +10,11 @@ export default function FormStream() {
 
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const onSubmit = (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
+  const onSubmit = async (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     e.preventDefault();
     console.log("start");
     answer.value = "";
     isLoading.value = true;
-
-    // const res = await fetch("/api/chat", {
-    //   method: "POST",
-    //   headers: {
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: JSON.stringify({
-    //     input: inputRef.current!.value,
-    //   }),
-    // });
 
     // console.log("test");
 
@@ -52,36 +42,48 @@ export default function FormStream() {
     //   isLoading.value = false;
     // }
 
-    const userInput = new URLSearchParams({
-      userInput: inputRef.current!.value,
-    });
-    const eventSource = new EventSource(
-      `/api/chat?${userInput}`,
-    );
+    // const userInput = new URLSearchParams({
+    //   userInput: inputRef.current!.value,
+    // });
 
-    eventSource.addEventListener("message", (e: MessageEvent) => {
-      isLoading.value = false;
-      isWriting.value = true;
-
-      console.log("e data", e);
-      if (e.data === "[DONE]") {
-        eventSource.close();
-        isWriting.value = false;
-        return;
-      }
-
-      // const completionResponse = JSON.parse(e.data);
-      // console.log("e data", completionResponse);
-
-      // const text = completionResponse.choices[0].delta?.content || "";
-
-      // answer.value += text;
+    const res = await fetch("/api/chat", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        userInput: inputRef.current!.value,
+      }),
     });
 
-    eventSource.addEventListener("error", (err) => {
-      isLoading.value = false;
-      console.error("soy error", err);
-    });
+    console.log("res", res);
+    // const eventSource = new EventSource(
+    //   `/api/chat?${userInput}`,
+    // );
+
+    // eventSource.addEventListener("message", (e: MessageEvent) => {
+    //   isLoading.value = false;
+    //   isWriting.value = true;
+
+    //   console.log("e data", e);
+    //   if (e.data === "[DONE]") {
+    //     eventSource.close();
+    //     isWriting.value = false;
+    //     return;
+    //   }
+
+    //   // const completionResponse = JSON.parse(e.data);
+    //   // console.log("e data", completionResponse);
+
+    //   // const text = completionResponse.choices[0].delta?.content || "";
+
+    //   // answer.value += text;
+    // });
+
+    // eventSource.addEventListener("error", (err) => {
+    //   isLoading.value = false;
+    //   console.error("soy error", err);
+    // });
 
     // console.log("completionResponse??", eventSource.readyState);
     isLoading.value = true;
