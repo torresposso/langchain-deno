@@ -13,7 +13,6 @@ const llm = new ChatOpenAI({
   openAIApiKey: ensureGetEnv("OPENAI_API_KEY"),
   cache: true,
   temperature: 0,
-  streaming: true,
 });
 
 const chatPrompt = ChatPromptTemplate.fromPromptMessages([

@@ -1,9 +1,4 @@
 import { chain } from "@/utils/chat.ts";
-import {
-  writeAll,
-  writeAllSync,
-  writerFromStreamWriter,
-} from "$std/streams/mod.ts";
 
 export async function handler(req: Request) {
   const corsHeaders = {
@@ -16,11 +11,35 @@ export async function handler(req: Request) {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  // const userInput = new URL(req.url).searchParams.get("userInput");
+  const userInput = new URL(req.url).searchParams.get("userInput");
 
-  const { userInput } = await req.json();
+  console.log("user", userInput);
 
-  return new Response(streamedToken?.value, {
+  let result;
+
+  const response = await chain.call(
+    { input: userInput },
+    [
+      {
+        handleLLMNewToken: async (token) => {
+          const text = `data: ${token}`;
+          const stream = new ReadableStream({
+            start(controller) {
+              controller.enqueue(text);
+            },
+          });
+          const reader = await stream.getReader().read();
+          result = reader;
+        },
+      },
+    ],
+  );
+
+  console.log("result", result?.value);
+  console.log("res", response);
+
+  return new Response(result?
+    result.value, {
     headers: {
       ...corsHeaders,
       "Content-Type": "text/event-stream",
