@@ -35,9 +35,6 @@ export async function handler(req: Request) {
     ],
   );
 
-  console.log("result", result?.value);
-  console.log("res", response);
-
   return new Response(result?
     result.value, {
     headers: {
