@@ -12,30 +12,39 @@ export default function FormStream() {
 
   const onSubmit = (e: JSX.TargetedEvent<HTMLFormElement, Event>) => {
     e.preventDefault();
-    console.log("start");
+
     answer.value = "";
     isLoading.value = true;
+
     const userInput = new URLSearchParams({
       userInput: inputRef.current!.value,
     });
-
     const eventSource = new EventSource(
       `/api/chat?${userInput}`,
     );
 
+    eventSource.addEventListener("error", (err) => {
+      isLoading.value = false;
+      console.error(err);
+    });
     eventSource.addEventListener("message", (e: MessageEvent) => {
       isLoading.value = false;
       isWriting.value = true;
-      console.log("mess", e);
+
+      if (e.data === "[DONE]") {
+        eventSource.close();
+        isWriting.value = false;
+        return;
+      }
+
+      const completionResponse = JSON.parse(e.data);
+      const text = completionResponse.choices[0].delta?.content || "";
+
+      answer.value += text;
     });
 
-    eventSource.addEventListener("error", (err) => {
-      isLoading.value = false;
-      console.error("soy error", err);
-    });
-
-    console.log("completionResponse??", eventSource.readyState);
     isLoading.value = true;
+    e.currentTarget.reset();
   };
 
   return (

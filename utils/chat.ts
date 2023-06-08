@@ -1,33 +1,46 @@
-import {
-  ChatPromptTemplate,
-  HumanMessagePromptTemplate,
-  MessagesPlaceholder,
-  SystemMessagePromptTemplate,
-} from "langchain/prompts";
-import { ChatOpenAI } from "langchain/chat_models/openai";
-import { ConversationChain } from "langchain/chains";
-import { BufferMemory } from "langchain/memory";
-import { ensureGetEnv } from "@/utils/env.ts";
+import { ensureGetEnv } from "./env.ts";
+import { ApplicationError } from "./errors.ts";
 
-const llm = new ChatOpenAI({
-  openAIApiKey: ensureGetEnv("OPENAI_API_KEY"),
-  cache: true,
-  temperature: 0,
-});
+const OPENAI_API_KEY = ensureGetEnv("OPENAI_API_KEY");
 
-const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-  SystemMessagePromptTemplate.fromTemplate(
-    "The following is a friendly chat between a human an IA. The IA is talkative and provides specific details from its context. If the AI does not know the answer to a question it truthfully says it does not know.",
-  ),
-  new MessagesPlaceholder("history"),
-  HumanMessagePromptTemplate.fromTemplate("{input}"),
-]);
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
 
-export const chain = new ConversationChain({
-  llm,
-  prompt: chatPrompt,
-  memory: new BufferMemory({
-    returnMessages: true,
-    memoryKey: "history",
-  }),
-});
+export async function chatCompletions(userInput: string) {
+  const chatCompletionsOptions = {
+    model: "gpt-3.5-turbo",
+    messages: [{
+      role: "user",
+      content: userInput,
+    }],
+    max_tokens: 256,
+    temperature: 0,
+    stream: true,
+  };
+
+  // The Fetch API allows for easier response streaming over the OpenAI client.
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    method: "POST",
+    body: JSON.stringify(chatCompletionsOptions),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new ApplicationError("Failed to generate completion", error);
+  }
+
+  // Proxy the streamed SSE response from OpenAI
+  return new Response(response.body, {
+    headers: {
+      "Access-Control-Allow-Headers":
+        "authorization, x-client-info, apikey, content-type",
+      "Content-Type": "text/event-stream",
+    },
+  });
+}
